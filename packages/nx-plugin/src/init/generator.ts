@@ -11,8 +11,10 @@ import {
 } from '../utils/git-secrets.js';
 import { applyWorkspaceInit, INIT_DEPENDENCIES } from '../utils/init.js';
 import { installDependencies } from '../utils/install.js';
+import { resolveFormatter } from '../utils/linter.js';
 import { addGeneratorMetricsIfApplicable } from '../utils/metrics.js';
 import { getGeneratorInfo, type NxGeneratorInfo } from '../utils/nx.js';
+import { formatChangesAfterInstall } from '../utils/oxc.js';
 import type { InitGeneratorSchema } from './schema';
 
 // `husky` is owned here rather than by the preset: both mark the workspace by
@@ -40,10 +42,16 @@ export const initGenerator = async (
     mcp,
     containers,
     gitSecrets,
+    linter,
+    formatter,
     preferInstallDependencies,
   }: InitGeneratorSchema,
 ): Promise<GeneratorCallback> => {
-  await applyWorkspaceInit(tree, { iac, containers, mcp }, DEPENDENCIES);
+  await applyWorkspaceInit(
+    tree,
+    { iac, containers, mcp, linter, formatter },
+    DEPENDENCIES,
+  );
 
   if (gitSecrets !== false) {
     setUpGitSecrets(tree, DEPENDENCIES);
@@ -52,10 +60,18 @@ export const initGenerator = async (
   await addGeneratorMetricsIfApplicable(tree, [INIT_GENERATOR_INFO]);
 
   await formatFilesInSubtree(tree);
-  return () =>
-    installDependencies(tree, preferInstallDependencies, {
+  // oxfmt is only installed by the callback below, so the files written here
+  // are formatted once it is.
+  const formatAfterInstall =
+    resolveFormatter(tree) === 'oxfmt'
+      ? formatChangesAfterInstall(tree)
+      : undefined;
+  return async () => {
+    await installDependencies(tree, preferInstallDependencies, {
       languages: ['typescript'],
     });
+    await formatAfterInstall?.();
+  };
 };
 
 export default initGenerator;

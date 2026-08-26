@@ -23,6 +23,22 @@
       "description": "Whether to configure the Nx Plugin for AWS MCP server for use by coding agents.",
       "default": true
     },
+    "linter": {
+      "type": "string",
+      "description": "The tool that lints TypeScript projects.",
+      "enum": ["biome", "oxlint"],
+      "default": "biome",
+      "x-priority": "important",
+      "x-prompt": "Which linter would you like to use? (default: biome)"
+    },
+    "formatter": {
+      "type": "string",
+      "description": "The tool that formats TypeScript projects.",
+      "enum": ["biome", "oxfmt"],
+      "default": "biome",
+      "x-priority": "important",
+      "x-prompt": "Which formatter would you like to use? (default: biome)"
+    },
     "containers": {
       "type": "string",
       "description": "The container engine to use for build/push/login. 'infer' picks docker if installed, otherwise finch (falling back to docker when neither is installed).",

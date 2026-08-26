@@ -4,10 +4,10 @@
  */
 import { readProjectConfiguration, type Tree } from '@nx/devkit';
 import { createTreeUsingTsSolutionSetup } from '../../utils/test.js';
-import { configureBiomeLint } from './biome.js';
 import tsProjectGenerator from './generator.js';
+import { configureLint } from './lint.js';
 
-describe('configureBiomeLint', () => {
+describe('configureLint', () => {
   let tree: Tree;
 
   beforeEach(async () => {
@@ -52,7 +52,7 @@ describe('configureBiomeLint', () => {
 
   it('should make the lint and format targets no-ops when there is no root biome.json', async () => {
     tree.delete('biome.json');
-    await configureBiomeLint(tree, {
+    await configureLint(tree, {
       dir: 'test',
       fullyQualifiedName: '@proj/test',
     });

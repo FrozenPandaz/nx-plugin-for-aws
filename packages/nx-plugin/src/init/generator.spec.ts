@@ -48,6 +48,79 @@ describe('init generator', () => {
     expect(readNxJson(tree)?.parallel).toBe(2);
   });
 
+  it('should vend biome for linting and formatting by default', async () => {
+    tree.delete('.oxfmtrc.json');
+    await initGenerator(tree, { iac: 'cdk', containers: 'docker' });
+    const config = readAwsNxPluginConfig(tree);
+    expect(config.linter.tool).toBe('biome');
+    expect(config.formatter.tool).toBe('biome');
+    expect(readJson(tree, 'biome.json')).toMatchObject({
+      formatter: { enabled: true },
+      linter: { enabled: true },
+    });
+    expect(tree.exists('.oxfmtrc.json')).toBe(false);
+    expect(tree.exists('.oxlintrc.json')).toBe(false);
+    const { devDependencies } = readJson(tree, 'package.json');
+    expect(devDependencies['@biomejs/biome']).toBeDefined();
+    expect(devDependencies.oxlint).toBeUndefined();
+    expect(devDependencies.oxfmt).toBeUndefined();
+  });
+
+  it('should vend oxlint via the @nx/oxlint plugin and oxfmt when chosen', async () => {
+    tree.delete('.oxfmtrc.json');
+    await initGenerator(tree, {
+      iac: 'cdk',
+      containers: 'docker',
+      linter: 'oxlint',
+      formatter: 'oxfmt',
+    });
+    const config = readAwsNxPluginConfig(tree);
+    expect(config.linter.tool).toBe('oxlint');
+    expect(config.formatter.tool).toBe('oxfmt');
+    expect(tree.exists('biome.json')).toBe(false);
+    expect(readJson(tree, '.oxfmtrc.json')).toMatchObject({
+      singleQuote: true,
+      sortImports: true,
+      ignorePatterns: expect.arrayContaining(['**/tsconfig*.json']),
+    });
+    expect(readJson(tree, '.oxlintrc.json')).toMatchObject({
+      categories: { correctness: 'error' },
+    });
+    const nxJson = readNxJson(tree);
+    expect(nxJson.plugins).toContainEqual({
+      plugin: '@nx/oxlint',
+      options: { targetName: 'lint' },
+    });
+    expect(nxJson.targetDefaults.lint).toMatchObject({
+      configurations: {
+        fix: { command: 'oxlint --fix .' },
+        'skip-lint': { command: 'node -e ""' },
+      },
+    });
+    const { devDependencies } = readJson(tree, 'package.json');
+    expect(devDependencies.oxlint).toBeDefined();
+    expect(devDependencies['@nx/oxlint']).toBeDefined();
+    expect(devDependencies.oxfmt).toBeDefined();
+    expect(devDependencies['@biomejs/biome']).toBeUndefined();
+  });
+
+  it('should disable the biome half another tool owns', async () => {
+    await initGenerator(tree, {
+      iac: 'cdk',
+      containers: 'docker',
+      linter: 'biome',
+      formatter: 'oxfmt',
+    });
+    expect(readJson(tree, 'biome.json')).toMatchObject({
+      formatter: { enabled: false },
+      linter: { enabled: true },
+    });
+    expect(tree.exists('.oxfmtrc.json')).toBe(true);
+    expect(readNxJson(tree).plugins ?? []).not.toContainEqual(
+      expect.objectContaining({ plugin: '@nx/oxlint' }),
+    );
+  });
+
   it('should register the sync generators on the compile target', async () => {
     await initGenerator(tree, { iac: 'cdk', containers: 'docker' });
     const syncGenerators =

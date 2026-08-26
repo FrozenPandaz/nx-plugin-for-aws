@@ -247,6 +247,8 @@ export default {
   iac: { provider: 'cdk' },
   containers: { engine: 'docker' },
   packageManager: { catalogs: true },
+  linter: { tool: 'biome' },
+  formatter: { tool: 'biome' },
 } satisfies AwsNxPluginConfig;
 "
 `;

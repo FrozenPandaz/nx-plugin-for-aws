@@ -7,6 +7,8 @@ import { Biome } from '@biomejs/js-api/nodejs';
 import { getProjects, type Tree } from '@nx/devkit';
 import { createRequire } from 'module';
 import path from 'path';
+import { type Formatter, type Linter, resolveFormatter } from './linter.js';
+import { formatWithOxfmt } from './oxc.js';
 import { type RuffOptions, ruffFixAndFormat } from './ruff.js';
 import { tryReadToml } from './toml.js';
 import { TS_VERSIONS } from './versions.js';
@@ -49,11 +51,17 @@ export const BIOME_ROLLDOWN_CONFIG_BUNDLE_EXCLUDE = `!${ROLLDOWN_CONFIG_BUNDLE_G
  * catalog resolver and reads `pnpm-workspace.yaml` exclusively — it does nothing
  * for yarn or bun catalogs, so vending it there would be misleading.
  */
-export const getDefaultBiomeConfig = (tree: Tree) => ({
+export const getDefaultBiomeConfig = (
+  tree: Tree,
+  {
+    linter = 'biome',
+    formatter = 'biome',
+  }: { linter?: Linter; formatter?: Formatter } = {},
+) => ({
   $schema: `https://biomejs.dev/schemas/${TS_VERSIONS['@biomejs/biome']}/schema.json`,
   root: true,
   formatter: {
-    enabled: true,
+    enabled: formatter === 'biome',
     indentStyle: 'space',
     indentWidth: 2,
     lineWidth: 80,
@@ -77,7 +85,7 @@ export const getDefaultBiomeConfig = (tree: Tree) => ({
     },
   },
   linter: {
-    enabled: true,
+    enabled: linter === 'biome',
     rules: {
       preset: 'none',
       correctness: {
@@ -182,7 +190,8 @@ const normalizeTreePath = (filePath: string): string =>
 
 /**
  * Format files in the given directory within the tree.
- * Handles both TypeScript/JavaScript/JSON (via biome) and Python (via ruff) files.
+ * Handles TypeScript/JavaScript/JSON (via biome or oxfmt, per the workspace's
+ * formatter choice) and Python (via ruff) files.
  * See https://github.com/nrwl/nx/blob/4cd640a9187954505d12de5b6d76a90d8ce4c2eb/packages/devkit/src/generators/format-files.ts#L11
  */
 export async function formatFilesInSubtree(
@@ -210,8 +219,8 @@ export async function formatFilesInSubtree(
   const otherFiles = changedFiles.filter(
     (file) =>
       BIOME_FORMATTABLE_EXTENSIONS.has(path.extname(file.path)) &&
-      // tsconfigs are not biome-managed: they're excluded from the vended
-      // format target (Nx's typescript-sync rewrites them without formatting),
+      // tsconfigs are not formatter-managed: they're excluded from the vended
+      // format config (Nx's typescript-sync rewrites them without formatting),
       // so formatting them at generation would only diverge from the form
       // written on later runs. Leave them as updateJson/writeJson emit them so
       // repeated generation stays idempotent.
@@ -243,6 +252,10 @@ export async function formatFilesInSubtree(
 
   if (otherFiles.length === 0) return;
 
+  if (resolveFormatter(tree) === 'oxfmt') {
+    await formatWithOxfmt(tree, otherFiles);
+    return;
+  }
   formatWithBiome(tree, otherFiles);
 }
 

@@ -8,7 +8,8 @@ import {
   type Tree,
   writeJson,
 } from '@nx/devkit';
-import { biomeTargets, registerBiomeNamedInput } from '../ts/lib/biome.js';
+import { registerBiomeNamedInput } from '../ts/lib/biome.js';
+import { lintTargets } from '../ts/lib/lint.js';
 import { normalizeTargetKeyOrder } from './nx.js';
 import { sortObjectKeys } from './object.js';
 import { getRelativePathToRootByDirectory } from './paths.js';
@@ -68,10 +69,11 @@ export const addScriptProjectTargets = (
     });
   }
 
+  const projectLintTargets = lintTargets(tree);
   project.targets ??= {};
   project.targets = sortObjectKeys({
     ...project.targets,
-    ...biomeTargets(tree),
+    ...projectLintTargets,
     typecheck: normalizeTargetKeyOrder({
       executor: 'nx:run-commands',
       cache: true,
@@ -87,5 +89,7 @@ export const addScriptProjectTargets = (
     }),
   });
 
-  registerBiomeNamedInput(tree);
+  if (Object.keys(projectLintTargets).length > 0) {
+    registerBiomeNamedInput(tree);
+  }
 };

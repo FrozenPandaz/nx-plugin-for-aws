@@ -15,7 +15,7 @@ import {
 import { isEsmWorkspace } from '../../utils/module-format.js';
 import { ensureProjectPackageJson } from '../../utils/project-package-json.js';
 import type { ITsDepVersion } from '../../utils/versions.js';
-import { configureBiomeLint } from './biome.js';
+import { configureLint } from './lint.js';
 import type { ConfigureProjectOptions } from './types.js';
 import { configureVitest, type VITEST_DEPENDENCIES } from './vitest.js';
 
@@ -186,7 +186,7 @@ export const configureTsProject = async <const D extends DependencyDeclaration>(
     { projectRoot: options.dir },
   );
 
-  await configureBiomeLint(tree, options);
+  await configureLint(tree, options);
   await configureVitest(
     tree,
     options,

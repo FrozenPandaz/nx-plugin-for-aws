@@ -12,7 +12,20 @@ import {
 } from '@nx/devkit';
 import { createTreeWithEmptyWorkspace } from '@nx/devkit/testing';
 import { expect } from 'vitest';
+import { AWS_NX_PLUGIN_CONFIG_FILE_NAME } from './config/utils.js';
 import { getDefaultBiomeConfig } from './format.js';
+import {
+  BIOME_CONFIG_FILE_NAME,
+  type Formatter,
+  type Linter,
+  OXFMT_CONFIG_FILE_NAME,
+  OXLINT_CONFIG_FILE_NAME,
+} from './linter.js';
+import {
+  getDefaultOxfmtConfig,
+  getDefaultOxlintConfig,
+  registerOxlintPlugin,
+} from './oxc.js';
 
 /** Formatter configs Nx discovers and formats generated files with. */
 const NX_FORMATTER_CONFIG_FILES = [
@@ -33,7 +46,13 @@ const NX_FORMATTER_CONFIG_FILES = [
  * - a root `package.json` with `type: module`, matching the ESM default the
  *   preset establishes
  */
-export const createTreeUsingTsSolutionSetup = (): Tree => {
+export const createTreeUsingTsSolutionSetup = ({
+  linter = 'biome',
+  formatter = 'biome',
+}: {
+  linter?: Linter;
+  formatter?: Formatter;
+} = {}): Tree => {
   const tree = createTreeWithEmptyWorkspace();
 
   // `createTreeWithEmptyWorkspace` seeds a formatter config Nx then formats
@@ -67,12 +86,30 @@ export const createTreeUsingTsSolutionSetup = (): Tree => {
     references: [],
   });
 
-  // The preset always writes biome.json at the workspace root, so mirror that
-  // here for realistic lint-target configuration.
-  tree.write(
-    'biome.json',
-    JSON.stringify(getDefaultBiomeConfig(tree), null, 2),
-  );
+  // The preset always writes the chosen tools' root configs, so mirror that
+  // here for realistic lint-target configuration. The choice itself is only
+  // recorded when it departs from the default, so the default tree stays a
+  // workspace without a plugin config, as most specs expect.
+  if (linter !== 'biome' || formatter !== 'biome') {
+    tree.write(
+      AWS_NX_PLUGIN_CONFIG_FILE_NAME,
+      `export default { linter: { tool: '${linter}' }, formatter: { tool: '${formatter}' } };\n`,
+    );
+  }
+  if (linter === 'biome' || formatter === 'biome') {
+    writeJson(
+      tree,
+      BIOME_CONFIG_FILE_NAME,
+      getDefaultBiomeConfig(tree, { linter, formatter }),
+    );
+  }
+  if (linter === 'oxlint') {
+    writeJson(tree, OXLINT_CONFIG_FILE_NAME, getDefaultOxlintConfig());
+    registerOxlintPlugin(tree, { formatTarget: formatter === 'biome' });
+  }
+  if (formatter === 'oxfmt') {
+    writeJson(tree, OXFMT_CONFIG_FILE_NAME, getDefaultOxfmtConfig());
+  }
   return tree;
 };
 

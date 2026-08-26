@@ -22,7 +22,9 @@ import {
 } from '../utils/git-secrets.js';
 import { applyWorkspaceInit, INIT_DEPENDENCIES } from '../utils/init.js';
 import { installDependencies } from '../utils/install.js';
+import { resolveFormatter } from '../utils/linter.js';
 import { getGeneratorInfo, type NxGeneratorInfo } from '../utils/nx.js';
+import { formatChangesAfterInstall } from '../utils/oxc.js';
 import type { PresetGeneratorSchema } from './schema';
 
 export const DEPENDENCIES = declareDependencies()({
@@ -92,6 +94,8 @@ export const presetGenerator = async (
     gitSecrets,
     mcp,
     containers,
+    linter,
+    formatter,
     module,
     catalog,
     preferInstallDependencies,
@@ -136,6 +140,8 @@ export const presetGenerator = async (
       iac,
       containers,
       mcp,
+      linter,
+      formatter,
       catalogs: catalog ?? true,
       readmeOverwriteStrategy: OverwriteStrategy.Overwrite,
       overwriteScripts: true,
@@ -152,10 +158,18 @@ export const presetGenerator = async (
   }
 
   await formatFilesInSubtree(tree);
-  return () =>
-    installDependencies(tree, preferInstallDependencies, {
+  // oxfmt is only installed by the callback below, so the files written here
+  // are formatted once it is.
+  const formatAfterInstall =
+    resolveFormatter(tree) === 'oxfmt'
+      ? formatChangesAfterInstall(tree)
+      : undefined;
+  return async () => {
+    await installDependencies(tree, preferInstallDependencies, {
       languages: ['typescript'],
     });
+    await formatAfterInstall?.();
+  };
 };
 
 export default presetGenerator;

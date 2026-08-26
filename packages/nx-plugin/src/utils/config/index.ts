@@ -5,10 +5,17 @@
 import type { LicenseConfig } from '../../license/config-types.js';
 import type { ContainersConfig } from '../containers.js';
 import type { IacConfig } from '../iac.js';
+import type { FormatterConfig, LinterConfig } from '../linter.js';
 
 export * from '../../license/config-types.js';
 export type { Containers, ContainersConfig } from '../containers.js';
 export type { Iac, IacConfig } from '../iac.js';
+export type {
+  Formatter,
+  FormatterConfig,
+  Linter,
+  LinterConfig,
+} from '../linter.js';
 
 /**
  * Configuration for how generators manage dependencies via the package manager
@@ -46,6 +53,16 @@ export interface AwsNxPluginConfig {
    * manager (e.g. whether to use dependency catalogs)
    */
   packageManager?: PackageManagerConfig;
+
+  /**
+   * Configuration for linting (biome or oxlint)
+   */
+  linter?: LinterConfig;
+
+  /**
+   * Configuration for formatting (biome or oxfmt)
+   */
+  formatter?: FormatterConfig;
 
   /**
    * List of tags

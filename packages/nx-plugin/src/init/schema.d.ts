@@ -5,6 +5,7 @@
 
 import { Containers } from '../utils/containers.js';
 import { Iac } from '../utils/iac.js';
+import type { Formatter, Linter } from '../utils/linter.js';
 
 export type InitContainersOption = Containers | 'infer';
 
@@ -13,5 +14,7 @@ export interface InitGeneratorSchema {
   readonly mcp?: boolean;
   readonly containers?: InitContainersOption;
   readonly gitSecrets?: boolean;
+  readonly linter?: Linter;
+  readonly formatter?: Formatter;
   readonly preferInstallDependencies?: boolean;
 }

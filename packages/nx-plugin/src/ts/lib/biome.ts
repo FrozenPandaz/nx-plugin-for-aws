@@ -7,11 +7,7 @@ import {
   type TargetConfiguration,
   type Tree,
   updateNxJson,
-  updateProjectConfiguration,
 } from '@nx/devkit';
-import { readProjectConfigurationUnqualified } from '../../utils/nx.js';
-import { sortObjectKeys } from '../../utils/object.js';
-import type { ConfigureProjectOptions } from './types.js';
 
 /**
  * The `format` and `lint` targets every Biome-linted project gets, so a project
@@ -89,27 +85,4 @@ export const registerBiomeNamedInput = (tree: Tree): void => {
       },
     });
   }
-};
-
-export const configureBiomeLint = async (
-  tree: Tree,
-  options: ConfigureProjectOptions,
-) => {
-  const projectJson = readProjectConfigurationUnqualified(
-    tree,
-    options.fullyQualifiedName,
-  );
-
-  updateProjectConfiguration(tree, options.fullyQualifiedName, {
-    ...projectJson,
-    // Sort targets so the lint and format targets land in deterministic
-    // positions regardless of whether they already existed (keeps re-runs
-    // stable)
-    targets: sortObjectKeys({
-      ...projectJson?.targets,
-      ...biomeTargets(tree),
-    }),
-  });
-
-  registerBiomeNamedInput(tree);
 };

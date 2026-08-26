@@ -10,6 +10,7 @@ import {
   type Tree,
   updateJson,
   updateNxJson,
+  writeJson,
 } from '@nx/devkit';
 import { initGenerator } from '@nx/js';
 import { readFileSync } from 'fs';
@@ -37,6 +38,13 @@ import {
 } from './generators.js';
 import { updateGitIgnore } from './git.js';
 import type { Iac } from './iac.js';
+import {
+  BIOME_CONFIG_FILE_NAME,
+  type Formatter,
+  type Linter,
+  OXFMT_CONFIG_FILE_NAME,
+  OXLINT_CONFIG_FILE_NAME,
+} from './linter.js';
 import { configureMcpServers } from './mcp.js';
 import { getNpmScope } from './npm-scope.js';
 import {
@@ -44,6 +52,11 @@ import {
   nxPluginMcpDependency,
   nxPluginSelfDependency,
 } from './nx.js';
+import {
+  getDefaultOxfmtConfig,
+  getDefaultOxlintConfig,
+  registerOxlintPlugin,
+} from './oxc.js';
 import { getPackageManagerDisplayCommands } from './pkg-manager.js';
 import { workspaceGlobs } from './project-package-json.js';
 import { type ITsDepVersion, withVersions } from './versions.js';
@@ -60,6 +73,9 @@ export const INIT_DEPENDENCIES = [
   { name: '@nx/workspace' },
   { name: 'typescript' },
   { name: '@biomejs/biome' },
+  { name: '@nx/oxlint' },
+  { name: 'oxlint' },
+  { name: 'oxfmt' },
 ] as const satisfies readonly { name: ITsDepVersion }[];
 
 // Built dependencies whose install scripts the generated workspace trusts.
@@ -104,6 +120,10 @@ export interface ApplyWorkspaceInitOptions {
    * catalog. Defaults to true.
    */
   readonly catalogs?: boolean;
+  /** The tool that lints TypeScript projects. Defaults to biome. */
+  readonly linter?: Linter;
+  /** The tool that formats TypeScript projects. Defaults to biome. */
+  readonly formatter?: Formatter;
 }
 
 /**
@@ -270,11 +290,19 @@ export const applyWorkspaceInit = async <const D extends DependencyDeclaration>(
     readmeOverwriteStrategy = OverwriteStrategy.KeepExisting,
     overwriteScripts = false,
     catalogs = true,
+    linter = 'biome',
+    formatter = 'biome',
   }: ApplyWorkspaceInitOptions,
   declaration: D & MustDeclare<typeof INIT_DEPENDENCIES, D>,
 ) => {
   const resolvedContainers =
     !containers || containers === 'infer' ? inferContainers() : containers;
+  const usesBiome = linter === 'biome' || formatter === 'biome';
+  const codeStyleDependencies = [
+    ...(usesBiome ? (['@biomejs/biome'] as const) : []),
+    ...(linter === 'oxlint' ? (['oxlint', '@nx/oxlint'] as const) : []),
+    ...(formatter === 'oxfmt' ? (['oxfmt'] as const) : []),
+  ];
 
   // The catalogs flag is written explicitly (even when true) so the workspace
   // records its dependency-management choice.
@@ -283,6 +311,8 @@ export const applyWorkspaceInit = async <const D extends DependencyDeclaration>(
     iac: { provider: iac },
     containers: { engine: resolvedContainers },
     packageManager: { catalogs },
+    linter: { tool: linter },
+    formatter: { tool: formatter },
   });
 
   // Set up the TypeScript plugin, base tsconfig, formatter etc. `@nx/js`
@@ -366,7 +396,7 @@ export const applyWorkspaceInit = async <const D extends DependencyDeclaration>(
       ]),
       ...withVersions(forDependencies<typeof INIT_DEPENDENCIES>(declaration), [
         'typescript',
-        '@biomejs/biome',
+        ...codeStyleDependencies,
       ]),
       // Declare the plugin the generators are running from, plus the MCP server
       // package the vended config runs, so both are pinned in the workspace's
@@ -376,12 +406,21 @@ export const applyWorkspaceInit = async <const D extends DependencyDeclaration>(
     },
   );
 
-  // Write biome.json for formatting and linting
-  if (!tree.exists('biome.json')) {
-    tree.write(
-      'biome.json',
-      JSON.stringify(getDefaultBiomeConfig(tree), null, 2),
+  if (usesBiome && !tree.exists(BIOME_CONFIG_FILE_NAME)) {
+    writeJson(
+      tree,
+      BIOME_CONFIG_FILE_NAME,
+      getDefaultBiomeConfig(tree, { linter, formatter }),
     );
+  }
+  if (linter === 'oxlint') {
+    if (!tree.exists(OXLINT_CONFIG_FILE_NAME)) {
+      writeJson(tree, OXLINT_CONFIG_FILE_NAME, getDefaultOxlintConfig());
+    }
+    registerOxlintPlugin(tree, { formatTarget: formatter === 'biome' });
+  }
+  if (formatter === 'oxfmt' && !tree.exists(OXFMT_CONFIG_FILE_NAME)) {
+    writeJson(tree, OXFMT_CONFIG_FILE_NAME, getDefaultOxfmtConfig());
   }
 
   generateFiles(

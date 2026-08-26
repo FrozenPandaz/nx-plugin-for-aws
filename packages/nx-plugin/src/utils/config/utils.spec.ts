@@ -18,6 +18,8 @@ describe('config utils', () => {
 
   beforeEach(async () => {
     tree = createTreeWithEmptyWorkspace();
+    // Nx seeds an oxfmt config; these specs assert the default biome formatting.
+    tree.delete('.oxfmtrc.json');
     await ensureAwsNxPluginConfig(tree);
   });
 
